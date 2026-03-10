@@ -1,0 +1,400 @@
+openapi: 3.1.0
+info:
+  title: ASOIAF GPT Actions API
+  version: 0.2.0
+  description: Starter Actions schema for a human-player ASOIAF GPT.
+servers:
+  - url: https://asoiaf-actions.onrender.com
+paths:
+  /campaigns:
+    post:
+      operationId: createCampaign
+      summary: Create a new campaign
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - canon_mode
+                - era
+                - play_mode
+                - player_character_name
+              properties:
+                name:
+                  type: string
+                canon_mode:
+                  type: string
+                  enum: [canon baseline, pre-diverged timeline]
+                era:
+                  type: string
+                play_mode:
+                  type: string
+                  enum: [human-player mode]
+                player_character_name:
+                  type: string
+                campaign_charter:
+                  type: string
+      responses:
+        "200":
+          description: Campaign created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  campaign_id:
+                    type: string
+                  status:
+                    type: string
+  /campaigns/{campaignId}/scene-packet:
+    get:
+      operationId: getScenePacket
+      summary: Get the current scene packet for a campaign
+      parameters:
+        - in: path
+          name: campaignId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Scene packet returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  campaign:
+                    type: object
+                    additionalProperties: true
+                  time_place:
+                    type: object
+                    additionalProperties: true
+                  immediate_situation:
+                    type: object
+                    additionalProperties: true
+                  player_state:
+                    type: object
+                    additionalProperties: true
+                  npcs:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+                  open_threads:
+                    type: array
+                    items:
+                      type: string
+                  canon_notes:
+                    type: array
+                    items:
+                      type: string
+                  continuity_warnings:
+                    type: array
+                    items:
+                      type: string
+  /campaigns/{campaignId}/checkpoints:
+    post:
+      operationId: saveCheckpoint
+      summary: Save a structured campaign checkpoint
+      parameters:
+        - in: path
+          name: campaignId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - session_summary
+                - scene_state
+                - player_state
+                - open_threads
+                - resume_prompt
+              properties:
+                session_summary:
+                  type: string
+                scene_state:
+                  type: object
+                  additionalProperties: true
+                player_state:
+                  type: object
+                  additionalProperties: true
+                npc_updates:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+                open_threads:
+                  type: array
+                  items:
+                    type: string
+                canon_continuity_notes:
+                  type: array
+                  items:
+                    type: string
+                resume_prompt:
+                  type: string
+      responses:
+        "200":
+          description: Checkpoint saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  checkpoint_id:
+                    type: string
+                  status:
+                    type: string
+                  saved_at:
+                    type: string
+  /campaigns/{campaignId}/npcs:
+    patch:
+      operationId: updateNpcs
+      summary: Update changed NPC records for a campaign
+      parameters:
+        - in: path
+          name: campaignId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - npc_updates
+              properties:
+                npc_updates:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      role:
+                        type: string
+                      visible_attitude:
+                        type: string
+                      immediate_aim:
+                        type: string
+                      location:
+                        type: string
+                      knowledge_delta:
+                        type: string
+                    additionalProperties: true
+      responses:
+        "200":
+          description: NPCs updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated_count:
+                    type: integer
+                  status:
+                    type: string
+  /campaigns/{campaignId}/advance-time:
+    post:
+      operationId: advanceTime
+      summary: Advance in-world time and apply delayed consequences
+      parameters:
+        - in: path
+          name: campaignId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - amount
+                - unit
+              properties:
+                amount:
+                  type: integer
+                unit:
+                  type: string
+                  enum: [minutes, hours, days]
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Time advanced
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  new_time:
+                    type: string
+                  applied_changes:
+                    type: array
+                    items:
+                      type: string
+                  status:
+                    type: string
+  /campaigns/{campaignId}/history:
+    get:
+      operationId: getRecentHistory
+      summary: Get recent major events for continuity support
+      parameters:
+        - in: path
+          name: campaignId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            default: 5
+      responses:
+        "200":
+          description: Recent history returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        happened_at:
+                          type: string
+                        summary:
+                          type: string
+                      additionalProperties: true
+  /canon/lookup:
+    post:
+      operationId: lookupCanon
+      summary: Lookup canon context for a character, house, place, or event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+              properties:
+                query:
+                  type: string
+                query_type:
+                  type: string
+                  enum: [character, house, place, event, unknown]
+      responses:
+        "200":
+          description: Canon lookup returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  query:
+                    type: string
+                  result_type:
+                    type: string
+                  summary:
+                    type: string
+                  facts:
+                    type: array
+                    items:
+                      type: string
+                  uncertainties:
+                    type: array
+                    items:
+                      type: string
+                  sources:
+                    type: array
+                    items:
+                      type: string
+  /campaigns/{campaignId}/events:
+    post:
+      operationId: logEvent
+      summary: Append a major event to the campaign timeline
+      parameters:
+        - in: path
+          name: campaignId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - summary
+              properties:
+                summary:
+                  type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Event logged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event_id:
+                    type: string
+                  status:
+                    type: string
+  /campaigns/{campaignId}/search:
+    post:
+      operationId: searchCampaignState
+      summary: Search campaign state for targeted questions
+      parameters:
+        - in: path
+          name: campaignId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+              properties:
+                query:
+                  type: string
+      responses:
+        "200":
+          description: Campaign search results returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  answer:
+                    type: string
+                  supporting_facts:
+                    type: array
+                    items:
+                      type: string

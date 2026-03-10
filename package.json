@@ -1,0 +1,8 @@
+{
+  "name": "asoiaf-actions",
+  "private": true,
+  "scripts": {
+    "actions:server": "node tools/gpt-actions-api/server.mjs",
+    "start": "node tools/gpt-actions-api/server.mjs"
+  }
+}
