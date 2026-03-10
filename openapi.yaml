@@ -1,12 +1,31 @@
 openapi: 3.1.0
 info:
   title: ASOIAF GPT Actions API
-  version: 0.2.0
-  description: Starter Actions schema for a human-player ASOIAF GPT.
+  version: 1.0.0
+  description: GPT Actions schema for a human-player ASOIAF DM backend.
 servers:
-  - url: https://asoiaf-actions.onrender.com
+  - url: https://your-koyeb-service.koyeb.app
 paths:
   /campaigns:
+    get:
+      operationId: listCampaigns
+      summary: List campaigns
+      parameters:
+        - in: query
+          name: include_archived
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Campaign list returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
     post:
       operationId: createCampaign
       summary: Create a new campaign
@@ -32,7 +51,7 @@ paths:
                   type: string
                 play_mode:
                   type: string
-                  enum: [human-player mode]
+                  enum: [human-player, human-player mode]
                 player_character_name:
                   type: string
                 campaign_charter:
@@ -49,6 +68,69 @@ paths:
                     type: string
                   status:
                     type: string
+  /campaigns/{campaignId}:
+    get:
+      operationId: getCampaign
+      summary: Get campaign metadata
+      parameters:
+        - in: path
+          name: campaignId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Campaign metadata returned
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /campaigns/{campaignId}/archive:
+    post:
+      operationId: archiveCampaign
+      summary: Archive a campaign
+      parameters:
+        - in: path
+          name: campaignId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Campaign archived
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /campaigns/{campaignId}/clone:
+    post:
+      operationId: cloneCampaign
+      summary: Clone a campaign into a new branch
+      parameters:
+        - in: path
+          name: campaignId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+      responses:
+        "200":
+          description: Campaign cloned
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
   /campaigns/{campaignId}/scene-packet:
     get:
       operationId: getScenePacket
@@ -66,36 +148,7 @@ paths:
             application/json:
               schema:
                 type: object
-                properties:
-                  campaign:
-                    type: object
-                    additionalProperties: true
-                  time_place:
-                    type: object
-                    additionalProperties: true
-                  immediate_situation:
-                    type: object
-                    additionalProperties: true
-                  player_state:
-                    type: object
-                    additionalProperties: true
-                  npcs:
-                    type: array
-                    items:
-                      type: object
-                      additionalProperties: true
-                  open_threads:
-                    type: array
-                    items:
-                      type: string
-                  canon_notes:
-                    type: array
-                    items:
-                      type: string
-                  continuity_warnings:
-                    type: array
-                    items:
-                      type: string
+                additionalProperties: true
   /campaigns/{campaignId}/checkpoints:
     post:
       operationId: saveCheckpoint
@@ -114,16 +167,30 @@ paths:
               type: object
               required:
                 - session_summary
-                - scene_state
                 - player_state
                 - open_threads
-                - resume_prompt
               properties:
                 session_summary:
                   type: string
                 scene_state:
                   type: object
                   additionalProperties: true
+                date:
+                  type: string
+                time:
+                  type: string
+                location:
+                  type: string
+                immediate_situation:
+                  type: string
+                visible_dangers:
+                  type: array
+                  items:
+                    type: string
+                present_npcs:
+                  type: array
+                  items:
+                    type: string
                 player_state:
                   type: object
                   additionalProperties: true
@@ -140,6 +207,9 @@ paths:
                   type: array
                   items:
                     type: string
+                continuity_state:
+                  type: object
+                  additionalProperties: true
                 resume_prompt:
                   type: string
       responses:
@@ -156,132 +226,24 @@ paths:
                     type: string
                   saved_at:
                     type: string
-  /campaigns/{campaignId}/npcs:
-    patch:
-      operationId: updateNpcs
-      summary: Update changed NPC records for a campaign
-      parameters:
-        - in: path
-          name: campaignId
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - npc_updates
-              properties:
-                npc_updates:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      name:
-                        type: string
-                      role:
-                        type: string
-                      visible_attitude:
-                        type: string
-                      immediate_aim:
-                        type: string
-                      location:
-                        type: string
-                      knowledge_delta:
-                        type: string
-                    additionalProperties: true
-      responses:
-        "200":
-          description: NPCs updated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  updated_count:
-                    type: integer
-                  status:
-                    type: string
-  /campaigns/{campaignId}/advance-time:
-    post:
-      operationId: advanceTime
-      summary: Advance in-world time and apply delayed consequences
-      parameters:
-        - in: path
-          name: campaignId
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - amount
-                - unit
-              properties:
-                amount:
-                  type: integer
-                unit:
-                  type: string
-                  enum: [minutes, hours, days]
-                reason:
-                  type: string
-      responses:
-        "200":
-          description: Time advanced
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  new_time:
-                    type: string
-                  applied_changes:
-                    type: array
-                    items:
-                      type: string
-                  status:
-                    type: string
-  /campaigns/{campaignId}/history:
+  /campaigns/{campaignId}/continuity-audit:
     get:
-      operationId: getRecentHistory
-      summary: Get recent major events for continuity support
+      operationId: getContinuityAudit
+      summary: Check for continuity gaps in the latest campaign state
       parameters:
         - in: path
           name: campaignId
           required: true
           schema:
             type: string
-        - in: query
-          name: limit
-          required: false
-          schema:
-            type: integer
-            default: 5
       responses:
         "200":
-          description: Recent history returned
+          description: Audit returned
           content:
             application/json:
               schema:
                 type: object
-                properties:
-                  events:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        happened_at:
-                          type: string
-                        summary:
-                          type: string
-                      additionalProperties: true
+                additionalProperties: true
   /canon/lookup:
     post:
       operationId: lookupCanon
@@ -307,94 +269,4 @@ paths:
             application/json:
               schema:
                 type: object
-                properties:
-                  query:
-                    type: string
-                  result_type:
-                    type: string
-                  summary:
-                    type: string
-                  facts:
-                    type: array
-                    items:
-                      type: string
-                  uncertainties:
-                    type: array
-                    items:
-                      type: string
-                  sources:
-                    type: array
-                    items:
-                      type: string
-  /campaigns/{campaignId}/events:
-    post:
-      operationId: logEvent
-      summary: Append a major event to the campaign timeline
-      parameters:
-        - in: path
-          name: campaignId
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - summary
-              properties:
-                summary:
-                  type: string
-                tags:
-                  type: array
-                  items:
-                    type: string
-      responses:
-        "200":
-          description: Event logged
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  event_id:
-                    type: string
-                  status:
-                    type: string
-  /campaigns/{campaignId}/search:
-    post:
-      operationId: searchCampaignState
-      summary: Search campaign state for targeted questions
-      parameters:
-        - in: path
-          name: campaignId
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - query
-              properties:
-                query:
-                  type: string
-      responses:
-        "200":
-          description: Campaign search results returned
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  answer:
-                    type: string
-                  supporting_facts:
-                    type: array
-                    items:
-                      type: string
+                additionalProperties: true
