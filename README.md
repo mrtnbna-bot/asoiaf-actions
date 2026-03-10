@@ -42,7 +42,7 @@ Postgres-backed GPT Actions backend for a `human-player` ASOIAF campaign, where 
 - `CANON_ROOT=content/canon`
 - `PORT=8000`
 
-`DATABASE_URL` is required. The service now uses Postgres as the durable source of truth.
+`DATABASE_URL` is required. The service uses Postgres as the durable source of truth.
 
 ## Local Run
 
@@ -58,25 +58,32 @@ Health check:
 curl http://127.0.0.1:3000/health
 ```
 
-## Koyeb Setup
+## Northflank Setup
 
-Recommended Koyeb shape:
+Recommended Northflank shape:
 
-1. Create one `PostgreSQL` database service.
-2. Create one `Web Service` from this GitHub repo.
-3. Set the start command to:
-
-```bash
-npm start
-```
-
-4. Set environment variables:
-   - `DATABASE_URL` from the Koyeb Postgres service
+1. Create one `Combined Project`.
+2. Add one `PostgreSQL` add-on.
+3. Add one `Service` from this GitHub repo.
+4. Use:
+   - build command: `npm install`
+   - start command: `npm start`
+   - port: `8000`
+5. Add environment variables:
    - `HOST=0.0.0.0`
    - `CANON_ROOT=content/canon`
    - `PORT=8000`
-5. Set the health check path to `/health`.
-6. After deploy, replace the placeholder server URL in `openapi.yaml` with your Koyeb app URL.
+6. Link the Postgres add-on to the service through a secret group or injected variables.
+7. Expose the database connection string to the app as `DATABASE_URL`.
+8. Configure an HTTP health check on `/health`.
+
+## Northflank Best Practices
+
+- Prefer a linked database secret group over manually copying credentials into the service.
+- Expose the workload database URI as `DATABASE_URL` so the app can start without code changes.
+- Use the public service URL for GPT Actions.
+- Do not point GPT Actions at private internal service addresses.
+- Avoid using the database administration connection string for the runtime workload when Northflank offers a workload-safe connection string through the add-on.
 
 ## GPT Actions Setup
 
@@ -87,10 +94,10 @@ npm start
 
 ```yaml
 servers:
-  - url: https://your-koyeb-service.koyeb.app
+  - url: https://your-public-service-url.example.com
 ```
 
-with your real Koyeb URL.
+with your real public Northflank service URL.
 
 ## Tests
 

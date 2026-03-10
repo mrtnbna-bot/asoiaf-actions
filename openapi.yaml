@@ -4,7 +4,7 @@ info:
   version: 1.0.0
   description: GPT Actions schema for a human-player ASOIAF DM backend.
 servers:
-  - url: https://your-koyeb-service.koyeb.app
+  - url: https://your-public-service-url.example.com
 paths:
   /campaigns:
     get:
@@ -85,7 +85,30 @@ paths:
             application/json:
               schema:
                 type: object
-                additionalProperties: true
+                properties:
+                  campaign_id:
+                    type: string
+                  name:
+                    type: string
+                  canon_mode:
+                    type: string
+                  era:
+                    type: string
+                  play_mode:
+                    type: string
+                  player_character_name:
+                    type: string
+                  campaign_charter:
+                    type: string
+                  status:
+                    type: string
+                  source_campaign_id:
+                    type: string
+                    nullable: true
+                  created_at:
+                    type: string
+                  updated_at:
+                    type: string
   /campaigns/{campaignId}/archive:
     post:
       operationId: archiveCampaign
@@ -103,7 +126,13 @@ paths:
             application/json:
               schema:
                 type: object
-                additionalProperties: true
+                properties:
+                  campaign_id:
+                    type: string
+                  status:
+                    type: string
+                  archived_at:
+                    type: string
   /campaigns/{campaignId}/clone:
     post:
       operationId: cloneCampaign
@@ -130,7 +159,13 @@ paths:
             application/json:
               schema:
                 type: object
-                additionalProperties: true
+                properties:
+                  campaign_id:
+                    type: string
+                  status:
+                    type: string
+                  source_campaign_id:
+                    type: string
   /campaigns/{campaignId}/scene-packet:
     get:
       operationId: getScenePacket
@@ -148,7 +183,88 @@ paths:
             application/json:
               schema:
                 type: object
-                additionalProperties: true
+                properties:
+                  campaign:
+                    type: object
+                    properties:
+                      campaign_id:
+                        type: string
+                      name:
+                        type: string
+                      canon_mode:
+                        type: string
+                      era:
+                        type: string
+                      play_mode:
+                        type: string
+                      player_character_name:
+                        type: string
+                  time_place:
+                    type: object
+                    properties:
+                      date:
+                        type: string
+                        nullable: true
+                      time:
+                        type: string
+                        nullable: true
+                      location:
+                        type: string
+                        nullable: true
+                  immediate_situation:
+                    type: object
+                    properties:
+                      summary:
+                        type: string
+                        nullable: true
+                      visible_dangers:
+                        type: array
+                        items:
+                          type: string
+                      present_npcs:
+                        type: array
+                        items:
+                          type: string
+                  player_state:
+                    type: object
+                    properties:
+                      current_condition:
+                        type: string
+                        nullable: true
+                      injuries:
+                        type: array
+                        items:
+                          type: string
+                      resources:
+                        type: array
+                        items:
+                          type: string
+                      social_position:
+                        type: string
+                        nullable: true
+                      active_pressures:
+                        type: array
+                        items:
+                          type: string
+                  npcs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                  open_threads:
+                    type: array
+                    items:
+                      type: string
+                  canon_notes:
+                    type: array
+                    items:
+                      type: string
+                  continuity_warnings:
+                    type: array
+                    items:
+                      type: string
   /campaigns/{campaignId}/checkpoints:
     post:
       operationId: saveCheckpoint
@@ -243,7 +359,28 @@ paths:
             application/json:
               schema:
                 type: object
-                additionalProperties: true
+                properties:
+                  campaign_id:
+                    type: string
+                  status:
+                    type: string
+                  closed_doors:
+                    type: array
+                    items:
+                      type: string
+                  contradiction_notes:
+                    type: array
+                    items:
+                      type: string
+                  warnings:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        code:
+                          type: string
+                        message:
+                          type: string
   /canon/lookup:
     post:
       operationId: lookupCanon
@@ -269,4 +406,30 @@ paths:
             application/json:
               schema:
                 type: object
-                additionalProperties: true
+                properties:
+                  query:
+                    type: string
+                  result_type:
+                    type: string
+                  summary:
+                    type: string
+                  facts:
+                    type: array
+                    items:
+                      type: string
+                  uncertainties:
+                    type: array
+                    items:
+                      type: string
+                  sources:
+                    type: array
+                    items:
+                      type: string
+                  cache:
+                    type: object
+                    properties:
+                      hit:
+                        type: boolean
+                      cached_at:
+                        type: string
+                        nullable: true

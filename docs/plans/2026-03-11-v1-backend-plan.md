@@ -4,9 +4,9 @@
 
 **Goal:** Replace the file-backed GPT Actions backend with a Postgres-backed v1 service that supports campaign management, scene packets, checkpoint persistence, canon caching, and continuity audits.
 
-**Architecture:** The API stays as a small Node HTTP service, but persistence moves into Postgres through a dedicated store layer. Campaign metadata, checkpoints, scene state, canon cache, and audit data are stored in relational tables so Koyeb can host the service durably and future cron jobs can operate on the same source of truth.
+**Architecture:** The API stays as a small Node HTTP service, but persistence moves into Postgres through a dedicated store layer. Campaign metadata, checkpoints, scene state, canon cache, and audit data are stored in relational tables so a managed host can run the service durably and future scheduled jobs can operate on the same source of truth.
 
-**Tech Stack:** Node.js, `pg`, `pg-mem`, native `node:test`, OpenAPI, Koyeb-hosted Postgres
+**Tech Stack:** Node.js, `pg`, `pg-mem`, native `node:test`, OpenAPI, managed Postgres
 
 ---
 
@@ -108,13 +108,13 @@ Add the routes and keep response shapes compact for GPT Actions.
 Run: `node --test tools/gpt-actions-api/server.test.mjs`
 Expected: PASS
 
-### Task 4: Add canon cache behavior and docs for Koyeb
+### Task 4: Add canon cache behavior and deployment docs
 
 **Files:**
 - Modify: `C:\Users\Martin\Desktop\asoiaf-actions-runtime\tools\gpt-actions-api\canon.mjs`
 - Modify: `C:\Users\Martin\Desktop\asoiaf-actions-runtime\openapi.yaml`
 - Modify: `C:\Users\Martin\Desktop\asoiaf-actions-runtime\README.md`
-- Create: `C:\Users\Martin\Desktop\asoiaf-actions-runtime\koyeb.yaml`
+- Create: `C:\Users\Martin\Desktop\asoiaf-actions-runtime\northflank.env.example`
 
 **Step 1: Write the failing test**
 
@@ -127,7 +127,7 @@ Expected: FAIL because cache rows are not written or surfaced.
 
 **Step 3: Write minimal implementation**
 
-Store canon lookup results in Postgres, expose cache metadata, and document Koyeb env vars and deployment steps.
+Store canon lookup results in Postgres, expose cache metadata, and document host env vars and deployment steps.
 
 **Step 4: Run test to verify it passes**
 
