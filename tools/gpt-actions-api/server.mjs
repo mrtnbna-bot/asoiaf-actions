@@ -129,6 +129,95 @@ function createRouter({ store, canonRoot }) {
         return;
       }
 
+      const npcListMatch = pathname.match(/^\/campaigns\/([^/]+)\/npcs$/);
+      if (request.method === "GET" && npcListMatch) {
+        const npcs = await store.listNpcs(npcListMatch[1]);
+        jsonResponse(response, 200, npcs);
+        return;
+      }
+
+      const npcMatch = pathname.match(/^\/campaigns\/([^/]+)\/npcs\/([^/]+)$/);
+      if (request.method === "GET" && npcMatch) {
+        const npc = await store.getNpcState(npcMatch[1], npcMatch[2]);
+        if (!npc) {
+          jsonResponse(response, 404, { error: "NPC not found." });
+          return;
+        }
+
+        jsonResponse(response, 200, npc);
+        return;
+      }
+
+      if (request.method === "PUT" && npcMatch) {
+        const payload = await readJsonBody(request);
+        const npc = await store.upsertNpcState(npcMatch[1], npcMatch[2], payload);
+        if (!npc) {
+          jsonResponse(response, 404, { error: "Campaign not found." });
+          return;
+        }
+
+        jsonResponse(response, 200, npc);
+        return;
+      }
+
+      const relationshipMatch = pathname.match(/^\/campaigns\/([^/]+)\/relationships$/);
+      if (request.method === "GET" && relationshipMatch) {
+        const focusKey = url.searchParams.get("focus");
+        if (!focusKey) {
+          jsonResponse(response, 400, { error: "Missing focus query parameter." });
+          return;
+        }
+
+        const relationships = await store.getRelationshipWeb(relationshipMatch[1], focusKey);
+        jsonResponse(response, 200, { focus: focusKey, relationships });
+        return;
+      }
+
+      const eventsMatch = pathname.match(/^\/campaigns\/([^/]+)\/events$/);
+      if (request.method === "POST" && eventsMatch) {
+        const payload = await readJsonBody(request);
+        const logged = await store.logEvent(eventsMatch[1], payload);
+        if (!logged) {
+          jsonResponse(response, 404, { error: "Campaign not found." });
+          return;
+        }
+
+        jsonResponse(response, 200, logged);
+        return;
+      }
+
+      if (request.method === "GET" && eventsMatch) {
+        const limit = Number(url.searchParams.get("limit") ?? 5);
+        const events = await store.getRecentEvents(eventsMatch[1], { limit });
+        jsonResponse(response, 200, { events });
+        return;
+      }
+
+      const advanceTimeMatch = pathname.match(/^\/campaigns\/([^/]+)\/advance-time$/);
+      if (request.method === "POST" && advanceTimeMatch) {
+        const payload = await readJsonBody(request);
+        const advanced = await store.advanceTime(advanceTimeMatch[1], payload);
+        if (!advanced) {
+          jsonResponse(response, 404, { error: "Campaign not found." });
+          return;
+        }
+
+        jsonResponse(response, 200, advanced);
+        return;
+      }
+
+      const worldTickMatch = pathname.match(/^\/campaigns\/([^/]+)\/world-tick$/);
+      if (request.method === "POST" && worldTickMatch) {
+        const result = await store.runWorldTick(worldTickMatch[1]);
+        if (!result) {
+          jsonResponse(response, 404, { error: "Campaign not found." });
+          return;
+        }
+
+        jsonResponse(response, 200, result);
+        return;
+      }
+
       if (request.method === "POST" && pathname === "/canon/lookup") {
         const payload = await readJsonBody(request);
         const query = payload.query;

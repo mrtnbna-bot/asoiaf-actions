@@ -161,3 +161,116 @@ test("lookupCanonCache stores and returns cached canon results", async () => {
 
   await pool.end();
 });
+
+test("NPC state, relationships, events, time advancement, and world tick persist as campaign mechanics", async () => {
+  const { pool, store } = await createStore();
+
+  const created = await store.createCampaign({
+    name: "Intrigue",
+    canon_mode: "canon baseline",
+    era: "298 AC",
+    play_mode: "human-player",
+    player_character_name: "Petyr Baelish",
+  });
+
+  await store.upsertNpcState(created.campaign_id, "varys", {
+    name: "Varys",
+    role: "Master of Whisperers",
+    location: "King's Landing",
+    core_nature: {
+      archetype: "spymaster",
+      drives: ["stability", "information"],
+    },
+    motive_stack: ["protect the realm", "test Petyr"],
+    emotional_state: {
+      baseline: "controlled",
+      current: "curious",
+    },
+    agenda_state: {
+      current_agenda: "probe Petyr",
+      current_step: "offer a soft warning",
+      urgency: 2,
+      progress: 0.25,
+      last_advanced_tick: null,
+    },
+    knowledge_state: {
+      known_facts: ["Petyr is ambitious"],
+      suspected_facts: ["Petyr is hiding a lever"],
+    },
+    commitments: {
+      promises_made: [],
+      threats_made: [],
+    },
+  });
+
+  await store.upsertRelationship(created.campaign_id, {
+    source_npc_id: "varys",
+    target_key: "player:petyr-baelish",
+    target_type: "player",
+    trust: -1,
+    fear: 0,
+    desire: 0,
+    leverage_over: 2,
+    leverage_under: 0,
+    volatility: 1,
+    debts: ["owes Petyr no favor"],
+    promises: [],
+  });
+
+  await store.logEvent(created.campaign_id, {
+    event_type: "meeting",
+    summary: "Varys quietly warns Petyr about dangerous court currents.",
+    location: "King's Landing",
+    actors: ["varys", "player:petyr-baelish"],
+    witnesses: [],
+    effects: ["rel_shift:varys->player:petyr-baelish:trust+1"],
+    followups: [
+      {
+        kind: "relationship_shift",
+        source_npc_id: "varys",
+        target_key: "player:petyr-baelish",
+        metric: "trust",
+        delta: 1,
+        due_day: 1,
+        due_hour: 2,
+      },
+      {
+        kind: "npc_agenda_advance",
+        npc_id: "varys",
+        progress_delta: 0.25,
+        due_day: 1,
+        due_hour: 2,
+        next_step: "watch Petyr's answer",
+      },
+    ],
+    player_visible: true,
+  });
+
+  const npcs = await store.listNpcs(created.campaign_id);
+  const varys = await store.getNpcState(created.campaign_id, "varys");
+  const relationshipsBefore = await store.getRelationshipWeb(created.campaign_id, "varys");
+  const timelineBefore = await store.getTimeline(created.campaign_id);
+  const advanced = await store.advanceTime(created.campaign_id, { hours: 2, reason: "court night deepens" });
+  const tick = await store.runWorldTick(created.campaign_id);
+  const relationshipsAfter = await store.getRelationshipWeb(created.campaign_id, "varys");
+  const recentEvents = await store.getRecentEvents(created.campaign_id, { limit: 5 });
+  const varysAfter = await store.getNpcState(created.campaign_id, "varys");
+
+  assert.equal(npcs.length, 1);
+  assert.equal(varys.name, "Varys");
+  assert.equal(relationshipsBefore.length, 1);
+  assert.equal(timelineBefore.current_day, 1);
+  assert.equal(timelineBefore.current_hour, 0);
+  assert.equal(advanced.timeline.current_hour, 2);
+  assert.equal(tick.applied_followups.length, 2);
+  assert.equal(relationshipsAfter[0].trust, 0);
+  assert.equal(varysAfter.agenda_state.progress, 0.5);
+  assert.equal(varysAfter.agenda_state.current_step, "watch Petyr's answer");
+  assert.ok(
+    recentEvents.some(
+      (event) => event.summary === "Varys quietly warns Petyr about dangerous court currents.",
+    ),
+  );
+
+  await pool.end();
+});

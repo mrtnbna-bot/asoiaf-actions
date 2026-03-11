@@ -15,6 +15,30 @@ Postgres-backed GPT Actions backend for a `human-player` ASOIAF campaign, where 
 - continuity audit
 - local canon lookup with Postgres cache
 
+## What V2 Adds
+
+- `npc-state`
+  - motive stack
+  - agenda state
+  - emotional state
+  - knowledge state
+  - commitments
+- `relationship metrics`
+  - trust
+  - fear
+  - desire
+  - leverage over / under
+  - volatility
+- `event ledger`
+  - actors
+  - witnesses
+  - effects
+  - due followups
+- `manual time advance`
+  - advances in-world campaign time only when called
+- `manual world tick`
+  - applies due followups to NPC and relationship state when called
+
 ## Repo Layout
 
 - `tools/gpt-actions-api/` HTTP API and persistence layer
@@ -33,6 +57,14 @@ Postgres-backed GPT Actions backend for a `human-player` ASOIAF campaign, where 
 - `GET /campaigns/{campaignId}/scene-packet`
 - `POST /campaigns/{campaignId}/checkpoints`
 - `GET /campaigns/{campaignId}/continuity-audit`
+- `GET /campaigns/{campaignId}/npcs`
+- `GET /campaigns/{campaignId}/npcs/{npcId}`
+- `PUT /campaigns/{campaignId}/npcs/{npcId}`
+- `GET /campaigns/{campaignId}/relationships?focus=...`
+- `GET /campaigns/{campaignId}/events`
+- `POST /campaigns/{campaignId}/events`
+- `POST /campaigns/{campaignId}/advance-time`
+- `POST /campaigns/{campaignId}/world-tick`
 - `POST /canon/lookup`
 
 ## Required Environment Variables
@@ -84,6 +116,15 @@ Recommended Northflank shape:
 - Use the public service URL for GPT Actions.
 - Do not point GPT Actions at private internal service addresses.
 - Avoid using the database administration connection string for the runtime workload when Northflank offers a workload-safe connection string through the add-on.
+- Keep `advance-time` and `world-tick` manual for this game. They should represent in-world time and consequence processing, not wall-clock automation.
+
+## When The GPT Should Use V2 Actions
+
+- Use `upsertNpcState` when a scene meaningfully changes an NPC's agenda, emotion, commitments, or knowledge.
+- Use `logEvent` when something happens that should create lasting consequences or due followups.
+- Use `advanceTime` only when in-world time has actually passed.
+- Use `runWorldTick` after manual time advancement or after a scene/event that should mature queued followups.
+- Use `getNpcState`, `listNpcs`, and `getRelationshipWeb` when the GPT needs durable state before narrating a consequential scene.
 
 ## GPT Actions Setup
 

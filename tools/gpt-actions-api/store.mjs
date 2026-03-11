@@ -24,6 +24,10 @@ function normalizeArray(value) {
   return [value];
 }
 
+function normalizeNumber(value, fallback = 0) {
+  return Number.isFinite(Number(value)) ? Number(value) : fallback;
+}
+
 function normalizePlayerState(playerState = {}) {
   return {
     current_condition: playerState.current_condition ?? null,
@@ -132,6 +136,164 @@ function canonCacheKey({ query, queryType }) {
     .toLowerCase()}`;
 }
 
+function normalizeTimelineRow(row) {
+  return {
+    campaign_id: row.campaign_id,
+    current_day: Number(row.current_day ?? 1),
+    current_hour: Number(row.current_hour ?? 0),
+    current_location: row.current_location ?? null,
+    updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
+  };
+}
+
+function normalizeNpcState(npcId, npc = {}) {
+  const agenda = npc.agenda_state ?? {};
+  return {
+    npc_id: npcId,
+    name: npc.name ?? npcId,
+    role: npc.role ?? null,
+    location: npc.location ?? null,
+    core_nature: npc.core_nature ?? {},
+    motive_stack: normalizeArray(npc.motive_stack),
+    emotional_state: npc.emotional_state ?? {},
+    agenda_state: {
+      current_agenda: agenda.current_agenda ?? null,
+      current_step: agenda.current_step ?? null,
+      urgency: normalizeNumber(agenda.urgency, 0),
+      progress: normalizeNumber(agenda.progress, 0),
+      last_advanced_tick: agenda.last_advanced_tick ?? null,
+    },
+    knowledge_state: npc.knowledge_state ?? {},
+    commitments: npc.commitments ?? {},
+  };
+}
+
+function npcRowToDto(row) {
+  return {
+    ...row.state,
+    npc_id: row.npc_id,
+    updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
+  };
+}
+
+function normalizeRelationship(input = {}) {
+  return {
+    source_npc_id: input.source_npc_id,
+    target_key: input.target_key,
+    target_type: input.target_type ?? "npc",
+    trust: normalizeNumber(input.trust, 0),
+    fear: normalizeNumber(input.fear, 0),
+    desire: normalizeNumber(input.desire, 0),
+    leverage_over: normalizeNumber(input.leverage_over, 0),
+    leverage_under: normalizeNumber(input.leverage_under, 0),
+    volatility: normalizeNumber(input.volatility, 0),
+    debts: normalizeArray(input.debts),
+    promises: normalizeArray(input.promises),
+  };
+}
+
+function relationshipRowToDto(row) {
+  return {
+    source_npc_id: row.source_npc_id,
+    target_key: row.target_key,
+    target_type: row.target_type,
+    trust: Number(row.trust),
+    fear: Number(row.fear),
+    desire: Number(row.desire),
+    leverage_over: Number(row.leverage_over),
+    leverage_under: Number(row.leverage_under),
+    volatility: Number(row.volatility),
+    debts: row.debts ?? [],
+    promises: row.promises ?? [],
+    updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
+  };
+}
+
+function normalizeFollowup(followup = {}) {
+  return {
+    kind: followup.kind ?? null,
+    source_npc_id: followup.source_npc_id ?? null,
+    npc_id: followup.npc_id ?? null,
+    target_key: followup.target_key ?? null,
+    metric: followup.metric ?? null,
+    delta: normalizeNumber(followup.delta, 0),
+    progress_delta: normalizeNumber(followup.progress_delta, 0),
+    due_day: Number.isFinite(Number(followup.due_day)) ? Number(followup.due_day) : null,
+    due_hour: Number.isFinite(Number(followup.due_hour)) ? Number(followup.due_hour) : null,
+    next_step: followup.next_step ?? null,
+    applied_at: followup.applied_at ?? null,
+  };
+}
+
+function normalizeEvent(event = {}) {
+  return {
+    event_type: event.event_type ?? "event",
+    summary: event.summary ?? "",
+    location: event.location ?? null,
+    actors: normalizeArray(event.actors),
+    witnesses: normalizeArray(event.witnesses),
+    effects: normalizeArray(event.effects),
+    followups: normalizeArray(event.followups).map(normalizeFollowup),
+    player_visible: event.player_visible !== false,
+  };
+}
+
+function eventRowToDto(row) {
+  return {
+    event_id: row.event_id,
+    campaign_id: row.campaign_id,
+    event_type: row.event_type,
+    summary: row.summary,
+    location: row.location,
+    actors: row.actors ?? [],
+    witnesses: row.witnesses ?? [],
+    effects: row.effects ?? [],
+    followups: row.followups ?? [],
+    player_visible: row.player_visible,
+    created_at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
+  };
+}
+
+function isFollowupDue(followup, timeline) {
+  if (followup.applied_at) {
+    return false;
+  }
+
+  const dueDay = Number.isFinite(followup.due_day) ? followup.due_day : null;
+  const dueHour = Number.isFinite(followup.due_hour) ? followup.due_hour : 0;
+  if (dueDay == null) {
+    return false;
+  }
+  if (timeline.current_day > dueDay) {
+    return true;
+  }
+  return timeline.current_day === dueDay && timeline.current_hour >= dueHour;
+}
+
+function advanceTimeline(timeline, hours = 0) {
+  const total = (timeline.current_day - 1) * 24 + timeline.current_hour + Number(hours);
+  return {
+    current_day: Math.floor(total / 24) + 1,
+    current_hour: ((total % 24) + 24) % 24,
+  };
+}
+
+function parseRelationshipEffect(effect) {
+  const match = /^rel_shift:(.+?)->(.+?):([a-z_]+)([+-]\d+(?:\.\d+)?)$/i.exec(
+    `${effect ?? ""}`.trim(),
+  );
+  if (!match) {
+    return null;
+  }
+
+  return {
+    source_npc_id: match[1],
+    target_key: match[2],
+    metric: match[3],
+    delta: Number(match[4]),
+  };
+}
+
 export class PostgresCampaignStore {
   constructor({ pool }) {
     this.pool = pool;
@@ -190,6 +352,13 @@ export class PostgresCampaignStore {
         `
           insert into continuity_state (campaign_id, closed_doors, contradiction_notes, updated_at)
           values ($1, '[]'::jsonb, '[]'::jsonb, $2)
+        `,
+        [campaign.campaign_id, createdAt],
+      );
+      await this.pool.query(
+        `
+          insert into campaign_timeline (campaign_id, current_day, current_hour, current_location, updated_at)
+          values ($1, 1, 0, null, $2)
         `,
         [campaign.campaign_id, createdAt],
       );
@@ -256,6 +425,7 @@ export class PostgresCampaignStore {
     const packet = await this.getScenePacket(campaignId);
     const continuity = await this.#getContinuityState(campaignId);
     const latestCheckpoint = await this.#getLatestCheckpoint(campaignId);
+    const timeline = await this.getTimeline(campaignId);
     const created = await this.createCampaign({
       name: name ?? `${campaign.name} Copy`,
       canon_mode: campaign.canon_mode,
@@ -290,6 +460,23 @@ export class PostgresCampaignStore {
       await this.pool.query(
         `update scene_packets set packet = $2::jsonb, updated_at = $3 where campaign_id = $1`,
         [clonedCampaignId, JSON.stringify(packet), nowIso()],
+      );
+    }
+
+    if (timeline) {
+      await this.pool.query(
+        `
+          update campaign_timeline
+          set current_day = $2, current_hour = $3, current_location = $4, updated_at = $5
+          where campaign_id = $1
+        `,
+        [
+          clonedCampaignId,
+          timeline.current_day,
+          timeline.current_hour,
+          timeline.current_location,
+          nowIso(),
+        ],
       );
     }
 
@@ -357,6 +544,14 @@ export class PostgresCampaignStore {
         ],
       );
       await this.pool.query(
+        `
+          update campaign_timeline
+          set current_location = coalesce($2, current_location), updated_at = $3
+          where campaign_id = $1
+        `,
+        [campaignId, normalizedCheckpoint.scene_state.location, savedAt],
+      );
+      await this.pool.query(
         `update campaigns set updated_at = $2 where campaign_id = $1`,
         [campaignId, savedAt],
       );
@@ -396,13 +591,11 @@ export class PostgresCampaignStore {
         code: "missing_scene_state",
         message: "No scene state has been recorded yet.",
       });
-    } else {
-      if (!packet.time_place.date || !packet.time_place.time || !packet.time_place.location) {
-        warnings.push({
-          code: "incomplete_time_place",
-          message: "Date, time, and location should all be present in the latest scene packet.",
-        });
-      }
+    } else if (!packet.time_place.date || !packet.time_place.time || !packet.time_place.location) {
+      warnings.push({
+        code: "incomplete_time_place",
+        message: "Date, time, and location should all be present in the latest scene packet.",
+      });
     }
 
     for (const note of continuity.contradiction_notes) {
@@ -461,6 +654,327 @@ export class PostgresCampaignStore {
     };
   }
 
+  async getTimeline(campaignId) {
+    const result = await this.pool.query(
+      `select * from campaign_timeline where campaign_id = $1`,
+      [campaignId],
+    );
+    return result.rows[0] ? normalizeTimelineRow(result.rows[0]) : null;
+  }
+
+  async advanceTime(campaignId, { hours = 0, reason = null } = {}) {
+    const campaign = await this.getCampaign(campaignId);
+    if (!campaign) {
+      return null;
+    }
+
+    const timeline = await this.getTimeline(campaignId);
+    const nextTimeline = advanceTimeline(timeline, hours);
+    const updatedAt = nowIso();
+
+    await this.pool.query(
+      `
+        update campaign_timeline
+        set current_day = $2, current_hour = $3, updated_at = $4
+        where campaign_id = $1
+      `,
+      [campaignId, nextTimeline.current_day, nextTimeline.current_hour, updatedAt],
+    );
+
+    if (reason) {
+      await this.logEvent(campaignId, {
+        event_type: "time_advance",
+        summary: reason,
+        location: timeline.current_location,
+        actors: [],
+        witnesses: [],
+        effects: [],
+        followups: [],
+        player_visible: false,
+      });
+    }
+
+    return {
+      status: "advanced",
+      timeline: {
+        campaign_id: campaignId,
+        current_day: nextTimeline.current_day,
+        current_hour: nextTimeline.current_hour,
+        current_location: timeline.current_location,
+        updated_at: updatedAt,
+      },
+    };
+  }
+
+  async upsertNpcState(campaignId, npcId, npc) {
+    const campaign = await this.getCampaign(campaignId);
+    if (!campaign) {
+      return null;
+    }
+
+    const normalized = normalizeNpcState(npcId, npc);
+    const updatedAt = nowIso();
+    await this.pool.query(
+      `
+        insert into npcs (campaign_id, npc_id, name, role, location, state, updated_at)
+        values ($1, $2, $3, $4, $5, $6::jsonb, $7)
+        on conflict (campaign_id, npc_id) do update
+        set name = excluded.name,
+            role = excluded.role,
+            location = excluded.location,
+            state = excluded.state,
+            updated_at = excluded.updated_at
+      `,
+      [
+        campaignId,
+        npcId,
+        normalized.name,
+        normalized.role,
+        normalized.location,
+        JSON.stringify(normalized),
+        updatedAt,
+      ],
+    );
+
+    return this.getNpcState(campaignId, npcId);
+  }
+
+  async getNpcState(campaignId, npcId) {
+    const result = await this.pool.query(
+      `select * from npcs where campaign_id = $1 and npc_id = $2`,
+      [campaignId, npcId],
+    );
+    return result.rows[0] ? npcRowToDto(result.rows[0]) : null;
+  }
+
+  async listNpcs(campaignId) {
+    const result = await this.pool.query(
+      `select * from npcs where campaign_id = $1 order by updated_at desc, npc_id asc`,
+      [campaignId],
+    );
+    return result.rows.map(npcRowToDto);
+  }
+
+  async upsertRelationship(campaignId, relationship) {
+    const campaign = await this.getCampaign(campaignId);
+    if (!campaign) {
+      return null;
+    }
+
+    const normalized = normalizeRelationship(relationship);
+    const updatedAt = nowIso();
+    await this.pool.query(
+      `
+        insert into npc_relationships (
+          campaign_id, source_npc_id, target_key, target_type, trust, fear, desire,
+          leverage_over, leverage_under, volatility, debts, promises, updated_at
+        ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13)
+        on conflict (campaign_id, source_npc_id, target_key) do update
+        set target_type = excluded.target_type,
+            trust = excluded.trust,
+            fear = excluded.fear,
+            desire = excluded.desire,
+            leverage_over = excluded.leverage_over,
+            leverage_under = excluded.leverage_under,
+            volatility = excluded.volatility,
+            debts = excluded.debts,
+            promises = excluded.promises,
+            updated_at = excluded.updated_at
+      `,
+      [
+        campaignId,
+        normalized.source_npc_id,
+        normalized.target_key,
+        normalized.target_type,
+        normalized.trust,
+        normalized.fear,
+        normalized.desire,
+        normalized.leverage_over,
+        normalized.leverage_under,
+        normalized.volatility,
+        JSON.stringify(normalized.debts),
+        JSON.stringify(normalized.promises),
+        updatedAt,
+      ],
+    );
+
+    const relationships = await this.getRelationshipWeb(campaignId, normalized.source_npc_id);
+    return relationships.find((item) => item.target_key === normalized.target_key) ?? null;
+  }
+
+  async getRelationshipWeb(campaignId, focusKey) {
+    const result = await this.pool.query(
+      `
+        select *
+        from npc_relationships
+        where campaign_id = $1 and source_npc_id = $2
+        order by updated_at desc, target_key asc
+      `,
+      [campaignId, focusKey],
+    );
+    return result.rows.map(relationshipRowToDto);
+  }
+
+  async logEvent(campaignId, event) {
+    const campaign = await this.getCampaign(campaignId);
+    if (!campaign) {
+      return null;
+    }
+
+    const normalized = normalizeEvent(event);
+    const eventId = `event-${campaignId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const createdAt = nowIso();
+
+    await this.pool.query(
+      `
+        insert into campaign_events (
+          event_id, campaign_id, event_type, summary, location, actors, witnesses,
+          effects, followups, player_visible, created_at
+        ) values ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8::jsonb,$9::jsonb,$10,$11)
+      `,
+      [
+        eventId,
+        campaignId,
+        normalized.event_type,
+        normalized.summary,
+        normalized.location,
+        JSON.stringify(normalized.actors),
+        JSON.stringify(normalized.witnesses),
+        JSON.stringify(normalized.effects),
+        JSON.stringify(normalized.followups),
+        normalized.player_visible,
+        createdAt,
+      ],
+    );
+
+    return {
+      event_id: eventId,
+      status: "logged",
+      created_at: createdAt,
+    };
+  }
+
+  async getRecentEvents(campaignId, { limit = 5 } = {}) {
+    const result = await this.pool.query(
+      `
+        select *
+        from campaign_events
+        where campaign_id = $1
+        order by created_at desc
+        limit $2
+      `,
+      [campaignId, limit],
+    );
+    return result.rows.map(eventRowToDto);
+  }
+
+  async runWorldTick(campaignId) {
+    const campaign = await this.getCampaign(campaignId);
+    if (!campaign) {
+      return null;
+    }
+
+    const timeline = await this.getTimeline(campaignId);
+    const events = await this.#getEvents(campaignId);
+    const appliedFollowups = [];
+
+    for (const event of events) {
+      const nextFollowups = [];
+
+      for (const followup of event.followups ?? []) {
+        if (!isFollowupDue(followup, timeline)) {
+          nextFollowups.push(followup);
+          continue;
+        }
+
+        let applied = false;
+
+        if (followup.kind === "relationship_shift") {
+          const current = await this.#getRelationship(
+            campaignId,
+            followup.source_npc_id,
+            followup.target_key,
+          );
+          const metricKey = followup.metric ?? "trust";
+          await this.upsertRelationship(campaignId, {
+            source_npc_id: followup.source_npc_id,
+            target_key: followup.target_key,
+            target_type: current?.target_type ?? (followup.target_key?.startsWith("player:") ? "player" : "npc"),
+            trust:
+              metricKey === "trust"
+                ? normalizeNumber(current?.trust, 0) + normalizeNumber(followup.delta, 0)
+                : normalizeNumber(current?.trust, 0),
+            fear:
+              metricKey === "fear"
+                ? normalizeNumber(current?.fear, 0) + normalizeNumber(followup.delta, 0)
+                : normalizeNumber(current?.fear, 0),
+            desire:
+              metricKey === "desire"
+                ? normalizeNumber(current?.desire, 0) + normalizeNumber(followup.delta, 0)
+                : normalizeNumber(current?.desire, 0),
+            leverage_over:
+              metricKey === "leverage_over"
+                ? normalizeNumber(current?.leverage_over, 0) + normalizeNumber(followup.delta, 0)
+                : normalizeNumber(current?.leverage_over, 0),
+            leverage_under:
+              metricKey === "leverage_under"
+                ? normalizeNumber(current?.leverage_under, 0) + normalizeNumber(followup.delta, 0)
+                : normalizeNumber(current?.leverage_under, 0),
+            volatility:
+              metricKey === "volatility"
+                ? normalizeNumber(current?.volatility, 0) + normalizeNumber(followup.delta, 0)
+                : normalizeNumber(current?.volatility, 0),
+            debts: current?.debts ?? [],
+            promises: current?.promises ?? [],
+          });
+          applied = true;
+        } else if (followup.kind === "npc_agenda_advance") {
+          const npc = await this.getNpcState(campaignId, followup.npc_id);
+          if (npc) {
+            await this.upsertNpcState(campaignId, followup.npc_id, {
+              ...npc,
+              agenda_state: {
+                ...npc.agenda_state,
+                progress:
+                  normalizeNumber(npc.agenda_state?.progress, 0) +
+                  normalizeNumber(followup.progress_delta, 0),
+                current_step: followup.next_step ?? npc.agenda_state?.current_step ?? null,
+                last_advanced_tick: `${timeline.current_day}:${timeline.current_hour}`,
+              },
+            });
+          }
+          applied = true;
+        }
+
+        if (applied) {
+          nextFollowups.push({
+            ...followup,
+            applied_at: nowIso(),
+          });
+          appliedFollowups.push({
+            event_id: event.event_id,
+            kind: followup.kind,
+            npc_id: followup.npc_id ?? followup.source_npc_id ?? null,
+            target_key: followup.target_key ?? null,
+          });
+        } else {
+          nextFollowups.push(followup);
+        }
+      }
+
+      await this.pool.query(
+        `update campaign_events set followups = $2::jsonb where event_id = $1`,
+        [event.event_id, JSON.stringify(nextFollowups)],
+      );
+    }
+
+    return {
+      status: "ok",
+      timeline,
+      applied_followups: appliedFollowups,
+    };
+  }
+
   async #getContinuityState(campaignId) {
     const result = await this.pool.query(
       `select closed_doors, contradiction_notes from continuity_state where campaign_id = $1`,
@@ -486,5 +1000,25 @@ export class PostgresCampaignStore {
       [campaignId],
     );
     return result.rows[0] ?? null;
+  }
+
+  async #getRelationship(campaignId, sourceNpcId, targetKey) {
+    const result = await this.pool.query(
+      `
+        select *
+        from npc_relationships
+        where campaign_id = $1 and source_npc_id = $2 and target_key = $3
+      `,
+      [campaignId, sourceNpcId, targetKey],
+    );
+    return result.rows[0] ? relationshipRowToDto(result.rows[0]) : null;
+  }
+
+  async #getEvents(campaignId) {
+    const result = await this.pool.query(
+      `select * from campaign_events where campaign_id = $1 order by created_at asc`,
+      [campaignId],
+    );
+    return result.rows.map(eventRowToDto);
   }
 }

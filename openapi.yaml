@@ -4,7 +4,7 @@ info:
   version: 1.0.0
   description: GPT Actions schema for a human-player ASOIAF DM backend.
 servers:
-  - url: https://your-public-service-url.example.com
+  - url: https://site--asoiaf-action--668vys4hhmtc.code.run
 paths:
   /campaigns:
     get:
@@ -381,6 +381,440 @@ paths:
                           type: string
                         message:
                           type: string
+  /campaigns/{campaignId}/npcs:
+    get:
+      operationId: listNpcs
+      summary: List tracked NPC state for a campaign
+      parameters:
+        - in: path
+          name: campaignId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: NPC list returned
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    npc_id:
+                      type: string
+                    name:
+                      type: string
+                    role:
+                      type: string
+                      nullable: true
+                    location:
+                      type: string
+                      nullable: true
+                    motive_stack:
+                      type: array
+                      items:
+                        type: string
+                    agenda_state:
+                      type: object
+                      properties:
+                        current_agenda:
+                          type: string
+                          nullable: true
+                        current_step:
+                          type: string
+                          nullable: true
+                        urgency:
+                          type: number
+                        progress:
+                          type: number
+                        last_advanced_tick:
+                          type: string
+                          nullable: true
+  /campaigns/{campaignId}/npcs/{npcId}:
+    get:
+      operationId: getNpcState
+      summary: Get tracked state for a single NPC
+      parameters:
+        - in: path
+          name: campaignId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: npcId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: NPC state returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  npc_id:
+                    type: string
+                  name:
+                    type: string
+                  role:
+                    type: string
+                    nullable: true
+                  location:
+                    type: string
+                    nullable: true
+                  core_nature:
+                    type: object
+                    additionalProperties: true
+                  motive_stack:
+                    type: array
+                    items:
+                      type: string
+                  emotional_state:
+                    type: object
+                    additionalProperties: true
+                  agenda_state:
+                    type: object
+                    properties:
+                      current_agenda:
+                        type: string
+                        nullable: true
+                      current_step:
+                        type: string
+                        nullable: true
+                      urgency:
+                        type: number
+                      progress:
+                        type: number
+                      last_advanced_tick:
+                        type: string
+                        nullable: true
+                  knowledge_state:
+                    type: object
+                    additionalProperties: true
+                  commitments:
+                    type: object
+                    additionalProperties: true
+    put:
+      operationId: upsertNpcState
+      summary: Create or update tracked NPC state
+      parameters:
+        - in: path
+          name: campaignId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: npcId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                role:
+                  type: string
+                location:
+                  type: string
+                core_nature:
+                  type: object
+                  additionalProperties: true
+                motive_stack:
+                  type: array
+                  items:
+                    type: string
+                emotional_state:
+                  type: object
+                  additionalProperties: true
+                agenda_state:
+                  type: object
+                  additionalProperties: true
+                knowledge_state:
+                  type: object
+                  additionalProperties: true
+                commitments:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "200":
+          description: NPC state saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  npc_id:
+                    type: string
+                  name:
+                    type: string
+                  agenda_state:
+                    type: object
+                    additionalProperties: true
+  /campaigns/{campaignId}/relationships:
+    get:
+      operationId: getRelationshipWeb
+      summary: Get the relationship web for one tracked NPC
+      parameters:
+        - in: path
+          name: campaignId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: focus
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Relationship web returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  focus:
+                    type: string
+                  relationships:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        source_npc_id:
+                          type: string
+                        target_key:
+                          type: string
+                        target_type:
+                          type: string
+                        trust:
+                          type: number
+                        fear:
+                          type: number
+                        desire:
+                          type: number
+                        leverage_over:
+                          type: number
+                        leverage_under:
+                          type: number
+                        volatility:
+                          type: number
+                        debts:
+                          type: array
+                          items:
+                            type: string
+                        promises:
+                          type: array
+                          items:
+                            type: string
+  /campaigns/{campaignId}/events:
+    get:
+      operationId: getRecentEvents
+      summary: Get recent event ledger entries
+      parameters:
+        - in: path
+          name: campaignId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Event ledger returned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        event_id:
+                          type: string
+                        event_type:
+                          type: string
+                        summary:
+                          type: string
+                        location:
+                          type: string
+                          nullable: true
+                        actors:
+                          type: array
+                          items:
+                            type: string
+                        witnesses:
+                          type: array
+                          items:
+                            type: string
+                        effects:
+                          type: array
+                          items:
+                            type: string
+                        followups:
+                          type: array
+                          items:
+                            type: object
+                            additionalProperties: true
+                        player_visible:
+                          type: boolean
+                        created_at:
+                          type: string
+    post:
+      operationId: logEvent
+      summary: Log an event with followups in the campaign event ledger
+      parameters:
+        - in: path
+          name: campaignId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - summary
+              properties:
+                event_type:
+                  type: string
+                summary:
+                  type: string
+                location:
+                  type: string
+                actors:
+                  type: array
+                  items:
+                    type: string
+                witnesses:
+                  type: array
+                  items:
+                    type: string
+                effects:
+                  type: array
+                  items:
+                    type: string
+                followups:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+                player_visible:
+                  type: boolean
+      responses:
+        "200":
+          description: Event logged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event_id:
+                    type: string
+                  status:
+                    type: string
+                  created_at:
+                    type: string
+  /campaigns/{campaignId}/advance-time:
+    post:
+      operationId: advanceTime
+      summary: Manually advance in-world campaign time
+      parameters:
+        - in: path
+          name: campaignId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                hours:
+                  type: number
+                reason:
+                  type: string
+      responses:
+        "200":
+          description: Campaign time advanced
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  timeline:
+                    type: object
+                    properties:
+                      campaign_id:
+                        type: string
+                      current_day:
+                        type: integer
+                      current_hour:
+                        type: integer
+                      current_location:
+                        type: string
+                        nullable: true
+                      updated_at:
+                        type: string
+  /campaigns/{campaignId}/world-tick:
+    post:
+      operationId: runWorldTick
+      summary: Manually apply due event-ledger followups to NPC and relationship state
+      parameters:
+        - in: path
+          name: campaignId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: World tick applied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  timeline:
+                    type: object
+                    properties:
+                      current_day:
+                        type: integer
+                      current_hour:
+                        type: integer
+                  applied_followups:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        event_id:
+                          type: string
+                        kind:
+                          type: string
+                        npc_id:
+                          type: string
+                          nullable: true
+                        target_key:
+                          type: string
+                          nullable: true
   /canon/lookup:
     post:
       operationId: lookupCanon
